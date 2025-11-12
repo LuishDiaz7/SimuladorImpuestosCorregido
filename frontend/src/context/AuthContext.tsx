@@ -38,9 +38,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       } catch (error: any) {
         if (error.response && error.response.status === 401) {
-           console.log("No hay sesión activa.");
+          console.log("No hay sesión activa.");
         } else {
-           console.error("Error verificando sesión:", error);
+          console.error("Error verificando sesión:", error);
         }
         setUser(null);
       } finally {
@@ -55,26 +55,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(userData);
   };
 
+  // BUG-008: Función de logout mejorada
   const logout = async () => {
-    setIsLoading(true);
+    // NO establecer isLoading=true aquí para no bloquear la UI
     try {
-        await apiClient.delete('/session');
-        setUser(null);
-        console.log("Sesión cerrada exitosamente en el servidor.");
-        
+      // Intentar cerrar sesión en el servidor
+      await apiClient.delete('/session');
+      console.log("Sesión cerrada exitosamente en el servidor.");
     } catch (error) {
-        console.error("Error al cerrar sesión en el servidor:", error);
-        setUser(null);
+      console.error("Error al cerrar sesión en el servidor:", error);
+      // Continuar con el logout local incluso si el servidor falla
     } finally {
-        setIsLoading(false);
+      // SIEMPRE limpiar el estado del usuario
+      setUser(null);
+      
+      // Limpiar cualquier dato persistente
+      localStorage.removeItem('user');
+      sessionStorage.clear();
+      
+      console.log("Estado de usuario limpiado.");
     }
   };
 
   const value = { user, isLoading, login, logout };
 
-  if (isLoading && !user) {
-     
-     return <div>Verificando sesión...</div>;
+  // Solo mostrar "Verificando sesión..." en la carga inicial
+  if (isLoading && user === null) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh'
+      }}>
+        Verificando sesión...
+      </div>
+    );
   }
 
   return (

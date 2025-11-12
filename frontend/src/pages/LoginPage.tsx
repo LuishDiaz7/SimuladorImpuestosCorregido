@@ -21,6 +21,8 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    
+    // BUG-005: Prevenir doble clic
     setIsLoading(true);
 
     try {
@@ -34,6 +36,7 @@ const LoginPage: React.FC = () => {
 
       login(response.data.user);
 
+      // BUG-004: Redirección correcta según rol
       if (response.data.user.es_admin) {
         navigate('/admin/users');
       } else {
@@ -42,11 +45,37 @@ const LoginPage: React.FC = () => {
 
     } catch (err: any) {
       console.error('Error en login:', err);
-      const apiErrorMessage = err.response?.data?.message || 'Error al iniciar sesión. Verifica tus credenciales.';
-      setError(apiErrorMessage);
+      
+      // BUG-002: Mensajes de error específicos
+      if (!err.response) {
+        // Error de red o servidor no disponible
+        setError('Error de conexión con el servidor. Por favor, verifica tu conexión e intenta nuevamente.');
+      } else if (err.response.status === 401 || err.response.status === 400) {
+        // Credenciales inválidas
+        setError('Credenciales inválidas. Por favor, verifica tu correo y contraseña.');
+      } else if (err.response.status >= 500) {
+        // Error del servidor
+        setError('Error interno del servidor. Por favor, intenta más tarde.');
+      } else {
+        // Otros errores
+        const apiErrorMessage = err.response?.data?.message || 'Error al iniciar sesión. Por favor, intenta nuevamente.';
+        setError(apiErrorMessage);
+      }
     } finally {
+      // BUG-005: Rehabilitar botón después de la petición
       setIsLoading(false);
     }
+  };
+
+  // BUG-001: Limpiar error cuando el usuario comienza a escribir
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCorreoElectronico(e.target.value);
+    if (error) setError(null);
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+    if (error) setError(null);
   };
 
   return (
@@ -59,9 +88,10 @@ const LoginPage: React.FC = () => {
             type="email"
             id="correo"
             value={correoElectronico}
-            onChange={(e) => setCorreoElectronico(e.target.value)}
+            onChange={handleEmailChange}
             required
             disabled={isLoading}
+            autoFocus // BUG-003: Autofocus en campo de email
           />
         </div>
         <div className="form-group">
@@ -70,7 +100,7 @@ const LoginPage: React.FC = () => {
             type="password"
             id="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={handlePasswordChange}
             required
             disabled={isLoading}
           />
@@ -78,11 +108,12 @@ const LoginPage: React.FC = () => {
 
         {error && <p className="error-message">{error}</p>}
 
+        {/* BUG-005: Botón deshabilitado durante carga */}
         <button type="submit" disabled={isLoading} style={{width: '100%'}}>
           {isLoading ? 'Iniciando...' : 'Iniciar Sesión'}
         </button>
       </form>
-      <div  className='link'>
+      <div className='link'>
         <Link to="/forgot-password">¿Olvidaste tu contraseña?</Link>
       </div>
     </div>

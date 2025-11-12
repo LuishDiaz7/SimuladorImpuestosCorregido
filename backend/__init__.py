@@ -12,8 +12,15 @@ def create_app():
     """Función de fábrica para crear la aplicación Flask."""
     app = Flask(__name__, instance_relative_config=True, static_folder=None, template_folder=None)
 
-    CORS(app, supports_credentials=True, origins=["*","http://localhost:5173"])
-
+    #CORS(app, supports_credentials=True, origins=["*","http://localhost:5173"])
+    CORS(app, 
+     resources={r"/api/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}}, 
+     supports_credentials=True,
+     allow_headers=['Content-Type', 'Authorization'],
+     expose_headers=['Set-Cookie'],
+     methods=['GET', 'POST', 'OPTIONS', 'DELETE', 'PUT']
+)
+    
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'una_clave_secreta_por_defecto_cambiar_en_prod')
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///' + os.path.join(app.instance_path, 'database.db'))
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False

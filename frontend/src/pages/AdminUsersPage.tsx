@@ -32,9 +32,11 @@ interface FormErrors {
 }
 
 const AdminUsersPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -49,11 +51,55 @@ const AdminUsersPage: React.FC = () => {
   });
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
-  const navigate = useNavigate();
 
+  // Verificar permisos correctamente
+  useEffect(() => {
+    // Esperar a que termine de cargar la autenticación
+    if (!authLoading) {
+      // Si no hay usuario O el usuario no es admin, redirigir
+      if (!user || !user.es_admin) {
+        console.log('Acceso denegado, redirigiendo a dashboard');
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [user, authLoading, navigate]);
 
+  // Mostrar spinner mientras carga la autenticación
+  if (authLoading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '400px' 
+      }}>
+        <p>Verificando permisos...</p>
+      </div>
+    );
+  }
+
+  // Early return si no es admin
+  if (!user || !user.es_admin) {
+    return (
+      <div style={{ 
+        textAlign: 'center', 
+        padding: '40px',
+        color: '#dc3545'
+      }}>
+        <h2>Acceso Denegado</h2>
+        <p>No tienes permisos para acceder a esta página.</p>
+      </div>
+    );
+  }
+
+  // Solo fetch datos si es admin verificado
   useEffect(() => {
     const fetchUsers = async () => {
+      // No hacer fetch si aún está cargando la autenticación
+      if (authLoading || !user || !user.es_admin) {
+        return;
+      }
+
       setLoading(true);
       setError(null);
       try {
@@ -66,16 +112,20 @@ const AdminUsersPage: React.FC = () => {
         }
       } catch (err: any) {
         console.error("Error al obtener usuarios:", err);
-        setError(err.response?.data?.message || 'Error al cargar los usuarios');
+        
+        if (err.response?.status === 403) {
+          setError('No tienes permisos para acceder a esta información');
+          navigate('/dashboard', { replace: true });
+        } else {
+          setError(err.response?.data?.message || 'Error al cargar los usuarios');
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    if (user && user.es_admin) {
-      fetchUsers();
-    }
-  }, [user, currentPage, searchQuery]);
+    fetchUsers();
+  }, [currentPage, searchQuery, user, authLoading, navigate]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -84,7 +134,6 @@ const AdminUsersPage: React.FC = () => {
   const handleToggleStatus = async (userId: number) => {
     try {
       await apiClient.post(`/admin/users/${userId}/toggle_status`);
-      // Actualizar la lista de usuarios después de cambiar el estado
       const response = await apiClient.get(`/admin/users?page=${currentPage}&q=${searchQuery}`);
       if (response.data && response.data.users) {
         setUsers(response.data.users);
@@ -103,7 +152,6 @@ const AdminUsersPage: React.FC = () => {
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }));
     
-    // Limpiar el error del campo cuando el usuario empieza a escribir
     if (formErrors[name]) {
       setFormErrors(prev => ({
         ...prev,
@@ -156,7 +204,6 @@ const AdminUsersPage: React.FC = () => {
       console.log('Usuario creado:', response.data);
       setFormSuccess('Usuario creado exitosamente');
       
-      // Resetear formulario
       setFormData({
         nombre_completo: '',
         tipo_documento: 'CC',
@@ -166,10 +213,8 @@ const AdminUsersPage: React.FC = () => {
         es_admin: false
       });
       
-      // Cerrar formulario
       setShowForm(false);
       
-      // Actualizar lista de usuarios
       const usersResponse = await apiClient.get(`/admin/users?page=${currentPage}&q=${searchQuery}`);
       if (usersResponse.data && usersResponse.data.users) {
         setUsers(usersResponse.data.users);
@@ -194,335 +239,328 @@ const AdminUsersPage: React.FC = () => {
     <div>
       <h2>Panel de Administración - Usuarios</h2>
       
-      {user && user.es_admin ? (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <input
-              type="text"
-              placeholder="Buscar usuarios..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              style={{
-                padding: '8px',
-                width: '300px',
-                borderRadius: '4px',
-                border: '1px solid #ccc'
-              }}
-            />
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <input
+          type="text"
+          placeholder="Buscar usuarios..."
+          value={searchQuery}
+          onChange={handleSearchChange}
+          style={{
+            padding: '8px',
+            width: '300px',
+            borderRadius: '4px',
+            border: '1px solid #ccc'
+          }}
+        />
+        <button
+          onClick={toggleFormVisibility}
+          style={{
+            backgroundColor: showForm ? '#6c757d' : '#28a745',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          {showForm ? 'Cancelar' : 'Agregar Usuario'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div style={{
+          backgroundColor: '#f8f9fa',
+          padding: '20px',
+          borderRadius: '8px',
+          marginBottom: '20px',
+          border: '1px solid #dee2e6'
+        }}>
+          <h3 style={{ marginTop: 0 }}>Nuevo Usuario</h3>
+          
+          {formSuccess && (
+            <div style={{
+              backgroundColor: '#d4edda',
+              color: '#155724',
+              padding: '10px',
+              borderRadius: '4px',
+              marginBottom: '15px'
+            }}>
+              {formSuccess}
+            </div>
+          )}
+          
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Nombre Completo:
+              </label>
+              <input
+                type="text"
+                name="nombre_completo"
+                value={formData.nombre_completo}
+                onChange={handleInputChange}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: `1px solid ${formErrors.nombre_completo ? '#dc3545' : '#ced4da'}`
+                }}
+              />
+              {formErrors.nombre_completo && (
+                <span style={{ color: '#dc3545', fontSize: '0.875em' }}>
+                  {formErrors.nombre_completo}
+                </span>
+              )}
+            </div>
+            
+            <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
+              <div style={{ flex: '1' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                  Tipo de Documento:
+                </label>
+                <select
+                  name="tipo_documento"
+                  value={formData.tipo_documento}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    border: `1px solid ${formErrors.tipo_documento ? '#dc3545' : '#ced4da'}`
+                  }}
+                >
+                  <option value="CC">Cédula de Ciudadanía</option>
+                  <option value="CE">Cédula de Extranjería</option>
+                  <option value="TI">Tarjeta de Identidad</option>
+                  <option value="PP">Pasaporte</option>
+                </select>
+                {formErrors.tipo_documento && (
+                  <span style={{ color: '#dc3545', fontSize: '0.875em' }}>
+                    {formErrors.tipo_documento}
+                  </span>
+                )}
+              </div>
+              
+              <div style={{ flex: '1' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                  Número de Documento:
+                </label>
+                <input
+                  type="text"
+                  name="numero_documento"
+                  value={formData.numero_documento}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    border: `1px solid ${formErrors.numero_documento ? '#dc3545' : '#ced4da'}`
+                  }}
+                />
+                {formErrors.numero_documento && (
+                  <span style={{ color: '#dc3545', fontSize: '0.875em' }}>
+                    {formErrors.numero_documento}
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Correo Electrónico:
+              </label>
+              <input
+                type="email"
+                name="correo_electronico"
+                value={formData.correo_electronico}
+                onChange={handleInputChange}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: `1px solid ${formErrors.correo_electronico ? '#dc3545' : '#ced4da'}`
+                }}
+              />
+              {formErrors.correo_electronico && (
+                <span style={{ color: '#dc3545', fontSize: '0.875em' }}>
+                  {formErrors.correo_electronico}
+                </span>
+              )}
+            </div>
+            
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+                Contraseña:
+              </label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: `1px solid ${formErrors.password ? '#dc3545' : '#ced4da'}`
+                }}
+              />
+              {formErrors.password && (
+                <span style={{ color: '#dc3545', fontSize: '0.875em' }}>
+                  {formErrors.password}
+                </span>
+              )}
+            </div>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="es_admin"
+                  checked={formData.es_admin}
+                  onChange={handleInputChange}
+                  style={{ marginRight: '8px' }}
+                />
+                <span>Asignar rol de administrador</span>
+              </label>
+            </div>
+            
             <button
-              onClick={toggleFormVisibility}
+              type="submit"
               style={{
-                backgroundColor: showForm ? '#6c757d' : '#28a745',
+                backgroundColor: '#007bff',
                 color: 'white',
                 border: 'none',
-                padding: '8px 16px',
+                padding: '10px 15px',
                 borderRadius: '4px',
                 cursor: 'pointer'
               }}
             >
-              {showForm ? 'Cancelar' : 'Agregar Usuario'}
+              Crear Usuario
             </button>
-          </div>
+          </form>
+        </div>
+      )}
 
-          {showForm && (
-            <div style={{
-              backgroundColor: '#f8f9fa',
-              padding: '20px',
-              borderRadius: '8px',
-              marginBottom: '20px',
-              border: '1px solid #dee2e6'
-            }}>
-              <h3 style={{ marginTop: 0 }}>Nuevo Usuario</h3>
-              
-              {formSuccess && (
-                <div style={{
-                  backgroundColor: '#d4edda',
-                  color: '#155724',
-                  padding: '10px',
-                  borderRadius: '4px',
-                  marginBottom: '15px'
-                }}>
-                  {formSuccess}
-                </div>
-              )}
-              
-              <form onSubmit={handleSubmit}>
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                    Nombre Completo:
-                  </label>
-                  <input
-                    type="text"
-                    name="nombre_completo"
-                    value={formData.nombre_completo}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
+      {loading ? (
+        <p>Cargando usuarios...</p>
+      ) : error ? (
+        <p style={{ color: 'red' }}>{error}</p>
+      ) : users.length === 0 ? (
+        <p>No hay usuarios para mostrar.</p>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ 
+            width: '100%', 
+            borderCollapse: 'collapse', 
+            marginTop: '20px',
+            border: '1px solid #ddd'
+          }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f2f2f2' }}>
+                <th style={tableHeaderStyle}>ID</th>
+                <th style={tableHeaderStyle}>Nombre</th>
+                <th style={tableHeaderStyle}>Email</th>
+                <th style={tableHeaderStyle}>Documento</th>
+                <th style={tableHeaderStyle}>Estado</th>
+                <th style={tableHeaderStyle}>Rol</th>
+                <th style={tableHeaderStyle}>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((userItem) => (
+                <tr key={userItem.id} style={{ borderBottom: '1px solid #ddd' }}>
+                  <td style={tableCellStyle}>{userItem.id}</td>
+                  <td style={tableCellStyle}>{userItem.nombre_completo}</td>
+                  <td style={tableCellStyle}>{userItem.correo_electronico}</td>
+                  <td style={tableCellStyle}>{userItem.tipo_documento} {userItem.numero_documento}</td>
+                  <td style={tableCellStyle}>
+                    <span style={{
+                      backgroundColor: userItem.estado === 'activo' ? '#d4edda' : '#f8d7da',
+                      color: userItem.estado === 'activo' ? '#155724' : '#721c24',
+                      padding: '3px 8px',
                       borderRadius: '4px',
-                      border: `1px solid ${formErrors.nombre_completo ? '#dc3545' : '#ced4da'}`
-                    }}
-                  />
-                  {formErrors.nombre_completo && (
-                    <span style={{ color: '#dc3545', fontSize: '0.875em' }}>
-                      {formErrors.nombre_completo}
+                      fontSize: '0.85em'
+                    }}>
+                      {userItem.estado}
                     </span>
-                  )}
-                </div>
-                
-                <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
-                  <div style={{ flex: '1' }}>
-                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                      Tipo de Documento:
-                    </label>
-                    <select
-                      name="tipo_documento"
-                      value={formData.tipo_documento}
-                      onChange={handleInputChange}
+                  </td>
+                  <td style={tableCellStyle}>
+                    {userItem.es_admin ? 'Administrador' : 'Usuario'}
+                  </td>
+                  <td style={tableCellStyle} className='formUsersButtons'>
+                    <button
+                      onClick={() => handleToggleStatus(userItem.id)}
                       style={{
-                        width: '100%',
-                        padding: '8px',
+                        backgroundColor: userItem.estado === 'activo' ? '#dc3545' : '#28a745',
+                        color: 'white',
+                        border: 'none',
+                        padding: '5px 10px',
                         borderRadius: '4px',
-                        border: `1px solid ${formErrors.tipo_documento ? '#dc3545' : '#ced4da'}`
+                        cursor: 'pointer'
+                      }}
+                      disabled={userItem.id === user.id}
+                    >
+                      {userItem.estado === 'activo' ? 'Desactivar' : 'Activar'}
+                    </button>
+                    <button
+                      onClick={() => navigate("/admin/update-user", {state: {id: userItem.id}})}
+                      style={{
+                        color: 'white',
+                        border: 'none',
+                        padding: '5px 10px',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
                       }}
                     >
-                      <option value="CC">Cédula de Ciudadanía</option>
-                      <option value="CE">Cédula de Extranjería</option>
-                      <option value="TI">Tarjeta de Identidad</option>
-                      <option value="PP">Pasaporte</option>
-                    </select>
-                    {formErrors.tipo_documento && (
-                      <span style={{ color: '#dc3545', fontSize: '0.875em' }}>
-                        {formErrors.tipo_documento}
-                      </span>
-                    )}
-                  </div>
-                  
-                  <div style={{ flex: '1' }}>
-                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                      Número de Documento:
-                    </label>
-                    <input
-                      type="text"
-                      name="numero_documento"
-                      value={formData.numero_documento}
-                      onChange={handleInputChange}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        borderRadius: '4px',
-                        border: `1px solid ${formErrors.numero_documento ? '#dc3545' : '#ced4da'}`
-                      }}
-                    />
-                    {formErrors.numero_documento && (
-                      <span style={{ color: '#dc3545', fontSize: '0.875em' }}>
-                        {formErrors.numero_documento}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                    Correo Electrónico:
-                  </label>
-                  <input
-                    type="email"
-                    name="correo_electronico"
-                    value={formData.correo_electronico}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      borderRadius: '4px',
-                      border: `1px solid ${formErrors.correo_electronico ? '#dc3545' : '#ced4da'}`
-                    }}
-                  />
-                  {formErrors.correo_electronico && (
-                    <span style={{ color: '#dc3545', fontSize: '0.875em' }}>
-                      {formErrors.correo_electronico}
-                    </span>
-                  )}
-                </div>
-                
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                    Contraseña:
-                  </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      borderRadius: '4px',
-                      border: `1px solid ${formErrors.password ? '#dc3545' : '#ced4da'}`
-                    }}
-                  />
-                  {formErrors.password && (
-                    <span style={{ color: '#dc3545', fontSize: '0.875em' }}>
-                      {formErrors.password}
-                    </span>
-                  )}
-                </div>
-                
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      name="es_admin"
-                      checked={formData.es_admin}
-                      onChange={handleInputChange}
-                      style={{ marginRight: '8px' }}
-                    />
-                    <span>Asignar rol de administrador</span>
-                  </label>
-                </div>
-                
-                <button
-                  type="submit"
-                  style={{
-                    backgroundColor: '#007bff',
-                    color: 'white',
-                    border: 'none',
-                    padding: '10px 15px',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Crear Usuario
-                </button>
-              </form>
-            </div>
-          )}
-
-          {loading ? (
-            <p>Cargando usuarios...</p>
-          ) : error ? (
-            <p style={{ color: 'red' }}>{error}</p>
-          ) : users.length === 0 ? (
-            <p>No hay usuarios para mostrar.</p>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ 
-                width: '100%', 
-                borderCollapse: 'collapse', 
-                marginTop: '20px',
-                border: '1px solid #ddd'
-              }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f2f2f2' }}>
-                    <th style={tableHeaderStyle}>ID</th>
-                    <th style={tableHeaderStyle}>Nombre</th>
-                    <th style={tableHeaderStyle}>Email</th>
-                    <th style={tableHeaderStyle}>Documento</th>
-                    <th style={tableHeaderStyle}>Estado</th>
-                    <th style={tableHeaderStyle}>Rol</th>
-                    <th style={tableHeaderStyle}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((userItem) => (
-                    <tr key={userItem.id} style={{ borderBottom: '1px solid #ddd' }}>
-                      <td style={tableCellStyle}>{userItem.id}</td>
-                      <td style={tableCellStyle}>{userItem.nombre_completo}</td>
-                      <td style={tableCellStyle}>{userItem.correo_electronico}</td>
-                      <td style={tableCellStyle}>{userItem.tipo_documento} {userItem.numero_documento}</td>
-                      <td style={tableCellStyle}>
-                        <span style={{
-                          backgroundColor: userItem.estado === 'activo' ? '#d4edda' : '#f8d7da',
-                          color: userItem.estado === 'activo' ? '#155724' : '#721c24',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontSize: '0.85em'
-                        }}>
-                          {userItem.estado}
-                        </span>
-                      </td>
-                      <td style={tableCellStyle}>
-                        {userItem.es_admin ? 'Administrador' : 'Usuario'}
-                      </td>
-                      <td  style={tableCellStyle} className='formUsersButtons'>
-                        <button
-                          onClick={() => handleToggleStatus(userItem.id)}
-                          style={{
-                            backgroundColor: userItem.estado === 'activo' ? '#dc3545' : '#28a745',
-                            color: 'white',
-                            border: 'none',
-                            padding: '5px 10px',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                          disabled={userItem.id === user.id}
-                        >
-                          {userItem.estado === 'activo' ? 'Desactivar' : 'Activar'}
-                        </button>
-                        <button
-                        onClick={() => navigate("/admin/update-user",{state:{id: userItem.id}})}
-                          style={{
-                            color: 'white',
-                            border: 'none',
-                            padding: '5px 10px',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                        
-                          Editar
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            marginTop: '20px' 
-          }}>
-            <button 
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
-              disabled={currentPage === 1 || loading}
-              style={{
-                padding: '5px 10px',
-                marginRight: '10px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                opacity: currentPage === 1 ? 0.5 : 1
-              }}
-            >
-              Anterior
-            </button>
-            <span style={{ margin: '0 10px' }}>Página {currentPage}</span>
-            <button 
-              onClick={() => setCurrentPage(prev => prev + 1)} 
-              disabled={users.length < 10 || loading}
-              style={{
-                padding: '5px 10px',
-                marginLeft: '10px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: users.length < 10 ? 'not-allowed' : 'pointer',
-                opacity: users.length < 10 ? 0.5 : 1
-              }}
-            >
-              Siguiente
-            </button>
-          </div>
-        </>
-      ) : (
-        <p>Acceso denegado. No eres administrador.</p>
+                      Editar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
+
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        marginTop: '20px' 
+      }}>
+        <button 
+          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+          disabled={currentPage === 1 || loading}
+          style={{
+            padding: '5px 10px',
+            marginRight: '10px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+            opacity: currentPage === 1 ? 0.5 : 1
+          }}
+        >
+          Anterior
+        </button>
+        <span style={{ margin: '0 10px' }}>Página {currentPage}</span>
+        <button 
+          onClick={() => setCurrentPage(prev => prev + 1)} 
+          disabled={users.length < 10 || loading}
+          style={{
+            padding: '5px 10px',
+            marginLeft: '10px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: users.length < 10 ? 'not-allowed' : 'pointer',
+            opacity: users.length < 10 ? 0.5 : 1
+          }}
+        >
+          Siguiente
+        </button>
+      </div>
     </div>
   );
 };
@@ -539,3 +577,4 @@ const tableCellStyle: React.CSSProperties = {
 };
 
 export default AdminUsersPage;
+

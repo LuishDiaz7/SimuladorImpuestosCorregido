@@ -1,12 +1,12 @@
 import type { FC, ChangeEvent, FormEvent } from 'react';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import apiClient from '../api/axiosConfig';
 import { useNavigate } from 'react-router-dom';
 import type { AxiosError } from 'axios';
 
-// Podríamos definir una interfaz más estricta si quisiéramos
+// Interfaz para el formulario
 interface DeclarationFormData {
-    ano_fiscal: number | string; // Permitir string para el input inicial
+    ano_fiscal: number | string;
     ingresos_totales: number | string;
     deducciones_aplicadas?: number | string;
     estado_civil: string;
@@ -20,27 +20,34 @@ interface ApiErrorResponse {
     errors?: Record<string, string>;
 }
 
+// BUG-013: Valores iniciales en constante reutilizable
+const INITIAL_FORM_DATA: DeclarationFormData = {
+    ano_fiscal: new Date().getFullYear() - 1,
+    ingresos_totales: '',
+    deducciones_aplicadas: '',
+    estado_civil: 'Soltero/a',
+    dependientes: '',
+    otros_ingresos_deducciones: ''
+};
+
 const NewDeclarationPage: FC = () => {
     const navigate = useNavigate();
-    const [formData, setFormData] = useState<DeclarationFormData>({
-        ano_fiscal: new Date().getFullYear() -1, // Año anterior por defecto
-        ingresos_totales: '',
-        deducciones_aplicadas: '',
-        estado_civil: 'Soltero/a', // Valor inicial
-        dependientes: '',
-        otros_ingresos_deducciones: ''
-    });
+    const [formData, setFormData] = useState<DeclarationFormData>(INITIAL_FORM_DATA);
     const [error, setError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [isLoading, setIsLoading] = useState(false);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        
+        // Limpiar errores cuando el usuario escribe
         if (fieldErrors[name]) {
             setFieldErrors(prev => ({ ...prev, [name]: '' }));
         }
-        if(error) setError(null);
+        if (error) setError(null);
+        if (successMessage) setSuccessMessage(null);
     };
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -48,36 +55,52 @@ const NewDeclarationPage: FC = () => {
         setIsLoading(true);
         setError(null);
         setFieldErrors({});
+        setSuccessMessage(null);
 
         const parsedAnoFiscal = Number.parseInt(String(formData.ano_fiscal), 10);
         const dataToSend = {
             ...formData,
             ano_fiscal: !Number.isNaN(parsedAnoFiscal) ? parsedAnoFiscal : null,
             ingresos_totales: Number.parseFloat(String(formData.ingresos_totales)) || null,
-            deducciones_aplicadas: formData.deducciones_aplicadas ? Number.parseFloat(String(formData.deducciones_aplicadas)) : 0.0,
-            dependientes: formData.dependientes ? Number.parseInt(String(formData.dependientes), 10) : null,
+            deducciones_aplicadas: formData.deducciones_aplicadas 
+                ? Number.parseFloat(String(formData.deducciones_aplicadas)) 
+                : 0.0,
+            dependientes: formData.dependientes 
+                ? Number.parseInt(String(formData.dependientes), 10) 
+                : null,
         };
 
         try {
             const response = await apiClient.post('/declarations', dataToSend);
             console.log('Declaración creada:', response.data);
-            alert('¡Declaración creada exitosamente!');
+            
+            // BUG-012: Mostrar mensaje de éxito
+            setSuccessMessage('¡Declaración creada exitosamente!');
 
-            // BUG 13: No limpiar el formulario después de éxito
-            // setFormData({ ...valores iniciales... }); // <-- Línea omitida intencionalmente
+            // BUG-012: Resetear formulario después del éxito
+            setFormData({ ...INITIAL_FORM_DATA });
 
-            // Opcional: redirigir al dashboard o a la lista de declaraciones
-            // navigate('/dashboard');
+            // Scroll al inicio para ver el mensaje de éxito
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // Opcional: Redirigir después de 2 segundos
+            setTimeout(() => {
+                navigate('/dashboard');
+            }, 2000);
 
         } catch (err) {
             const error = err as AxiosError<ApiErrorResponse>;
             console.error("Error al crear declaración:", error);
+            
             if (error.response?.status === 422 && error.response.data?.errors) {
                 setError('Por favor corrige los errores en el formulario.');
                 setFieldErrors(error.response.data.errors);
             } else {
                 setError(error.response?.data?.message || 'Error al crear la declaración.');
             }
+            
+            // Scroll al inicio para ver el error
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         } finally {
             setIsLoading(false);
         }
@@ -86,6 +109,21 @@ const NewDeclarationPage: FC = () => {
     return (
         <div className="form-container">
             <h2>Crear Nueva Declaración de Impuestos</h2>
+            
+            {/*  Mensaje de éxito */}
+            {successMessage && (
+                <div style={{
+                    backgroundColor: '#d4edda',
+                    color: '#155724',
+                    padding: '12px',
+                    borderRadius: '4px',
+                    marginBottom: '20px',
+                    border: '1px solid #c3e6cb'
+                }}>
+                    {successMessage}
+                </div>
+            )}
+            
             <form onSubmit={handleSubmit}>
                 {error && <p className="error-message">{error}</p>}
 
@@ -99,8 +137,12 @@ const NewDeclarationPage: FC = () => {
                         onChange={handleChange}
                         required
                         disabled={isLoading}
+                        min="2000"
+                        max="2100"
                     />
-                    {fieldErrors.ano_fiscal && <span className="error-message">{fieldErrors.ano_fiscal}</span>}
+                    {fieldErrors.ano_fiscal && (
+                        <span className="error-message">{fieldErrors.ano_fiscal}</span>
+                    )}
                 </div>
 
                 <div className="form-group">
@@ -115,8 +157,11 @@ const NewDeclarationPage: FC = () => {
                         required
                         disabled={isLoading}
                         placeholder="Ej: 50000.00"
+                        min="0"
                     />
-                    {fieldErrors.ingresos_totales && <span className="error-message">{fieldErrors.ingresos_totales}</span>}
+                    {fieldErrors.ingresos_totales && (
+                        <span className="error-message">{fieldErrors.ingresos_totales}</span>
+                    )}
                 </div>
 
                 <div className="form-group">
@@ -134,10 +179,12 @@ const NewDeclarationPage: FC = () => {
                         <option value="Divorciado/a">Divorciado/a</option>
                         <option value="Viudo/a">Viudo/a</option>
                     </select>
-                     {fieldErrors.estado_civil && <span className="error-message">{fieldErrors.estado_civil}</span>}
+                    {fieldErrors.estado_civil && (
+                        <span className="error-message">{fieldErrors.estado_civil}</span>
+                    )}
                 </div>
 
-                 <div className="form-group">
+                <div className="form-group">
                     <label htmlFor="deducciones_aplicadas">Deducciones Aplicadas:</label>
                     <input
                         type="number"
@@ -148,8 +195,11 @@ const NewDeclarationPage: FC = () => {
                         onChange={handleChange}
                         disabled={isLoading}
                         placeholder="Opcional, Ej: 5000.00"
+                        min="0"
                     />
-                     {fieldErrors.deducciones_aplicadas && <span className="error-message">{fieldErrors.deducciones_aplicadas}</span>}
+                    {fieldErrors.deducciones_aplicadas && (
+                        <span className="error-message">{fieldErrors.deducciones_aplicadas}</span>
+                    )}
                 </div>
 
                 <div className="form-group">
@@ -162,12 +212,18 @@ const NewDeclarationPage: FC = () => {
                         onChange={handleChange}
                         disabled={isLoading}
                         placeholder="Opcional, Ej: 2"
+                        min="0"
+                        max="99"
                     />
-                    {fieldErrors.dependientes && <span className="error-message">{fieldErrors.dependientes}</span>}
+                    {fieldErrors.dependientes && (
+                        <span className="error-message">{fieldErrors.dependientes}</span>
+                    )}
                 </div>
 
                 <div className="form-group">
-                    <label htmlFor="otros_ingresos_deducciones">Otros Ingresos / Deducciones (Notas):</label>
+                    <label htmlFor="otros_ingresos_deducciones">
+                        Otros Ingresos / Deducciones (Notas):
+                    </label>
                     <textarea
                         id="otros_ingresos_deducciones"
                         name="otros_ingresos_deducciones"
@@ -176,7 +232,11 @@ const NewDeclarationPage: FC = () => {
                         disabled={isLoading}
                         rows={3}
                         placeholder="Opcional"
+                        maxLength={1000}
                     />
+                    <small style={{ color: '#666', fontSize: '0.85em' }}>
+                        {formData.otros_ingresos_deducciones?.length || 0}/1000 caracteres
+                    </small>
                 </div>
 
                 <button type="submit" disabled={isLoading} style={{ width: '100%' }}>
@@ -187,4 +247,4 @@ const NewDeclarationPage: FC = () => {
     );
 };
 
-export default NewDeclarationPage; 
+export default NewDeclarationPage;

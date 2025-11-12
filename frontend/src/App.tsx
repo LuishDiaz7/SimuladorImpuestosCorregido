@@ -1,6 +1,6 @@
 import type { FC, MouseEvent, FocusEvent } from 'react';
-import React from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -15,6 +15,10 @@ import UpdateUserPage from './pages/UpdateUserPage';
 
 function App() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  
+  // BUG-008: Estado para manejar el proceso de logout
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleMouseOver = (e: MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.style.backgroundColor = 'var(--color-secondary-dark)';
@@ -30,6 +34,27 @@ function App() {
 
   const handleBlur = (e: FocusEvent<HTMLButtonElement>) => {
     e.currentTarget.style.backgroundColor = 'var(--color-secondary)';
+  };
+
+  // BUG-008: Función mejorada de logout con redirección garantizada
+  const handleLogout = async () => {
+    if (isLoggingOut) return; // Prevenir múltiples clics
+    
+    setIsLoggingOut(true);
+    
+    try {
+      // Llamar a logout del contexto
+      await logout();
+      
+      // Forzar navegación a login después de logout
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Error durante logout:', error);
+      // Incluso si hay error, navegar a login
+      navigate('/login', { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -49,19 +74,26 @@ function App() {
         {user && !user.es_admin && <Link to="/dashboard">Mi Panel</Link>}
         {user && !user.es_admin && <Link to="/nueva-declaracion">Nueva Declaración</Link>}
         {user?.es_admin && <Link to="/admin/users">Admin Usuarios</Link>}
-        {user && <button
-                    type="button"
-                    onClick={logout}
-                    style={{
-                        marginLeft: 'auto',
-                        backgroundColor: 'var(--color-secondary)',
-                        padding: '0.4em 0.8em'
-                    }}
-                    onMouseOver={handleMouseOver}
-                    onFocus={handleFocus}
-                    onMouseOut={handleMouseOut}
-                    onBlur={handleBlur}
-                 >Cerrar Sesión</button>}
+        {user && (
+          <button
+            type="button"
+            onClick={handleLogout} // Usar nueva función de logout
+            disabled={isLoggingOut} // Deshabilitar durante logout
+            style={{
+              marginLeft: 'auto',
+              backgroundColor: 'var(--color-secondary)',
+              padding: '0.4em 0.8em',
+              cursor: isLoggingOut ? 'wait' : 'pointer',
+              opacity: isLoggingOut ? 0.7 : 1
+            }}
+            onMouseOver={handleMouseOver}
+            onFocus={handleFocus}
+            onMouseOut={handleMouseOut}
+            onBlur={handleBlur}
+          >
+            {isLoggingOut ? 'Cerrando...' : 'Cerrar Sesión'}
+          </button>
+        )}
       </nav>
 
       <div className="container">
@@ -74,7 +106,6 @@ function App() {
           <Route path="/register" element={<RegisterPage/>} />
 
           {/* Rutas protegidas */}
-
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/nueva-declaracion" element={<NewDeclarationPage />} />
@@ -86,7 +117,7 @@ function App() {
         </Routes>
       </div>
     </>
-  )
+  );
 }
 
-export default App 
+export default App;

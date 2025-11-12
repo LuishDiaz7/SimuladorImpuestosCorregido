@@ -151,28 +151,61 @@ def create_declaration():
     required_fields = ['ano_fiscal', 'ingresos_totales', 'estado_civil']
     errors = {field: f'{field.replace("_"," ").capitalize()} es requerido.' for field in required_fields if field not in data or data[field] is None}
 
+    # Validación de año fiscal
     try:
         ano = int(data.get('ano_fiscal', 0))
-        if not 2000 <= ano <= 2100: errors['ano_fiscal'] = 'Año fiscal inválido.'
+        if not 2000 <= ano <= 2100: 
+            errors['ano_fiscal'] = 'Año fiscal inválido. Debe estar entre 2000 y 2100.'
     except (ValueError, TypeError):
-        errors['ano_fiscal'] = 'Año fiscal debe ser un número.'
+        errors['ano_fiscal'] = 'Año fiscal debe ser un número entero válido.'
 
-    # BUG 11: Validación incompleta - No se valida si los ingresos son negativos
+    # BUG-011: Validación completa de ingresos totales
     try:
-        ingresos = float(data.get('ingresos_totales', 0.0)) # Se parsea pero no se valida >= 0
-        # if ingresos < 0: errors['ingresos_totales'] = 'Ingresos totales deben ser positivos.' # <-- Validación comentada/omitida intencionalmente
+        ingresos = float(data.get('ingresos_totales', 0.0))
+        
+        # Validar que no sea negativo
+        if ingresos < 0:
+            errors['ingresos_totales'] = 'Los ingresos totales no pueden ser negativos.'
+        
+        # Validar rango razonable (opcional pero recomendado)
+        if ingresos > 999999999999:  # Límite razonable
+            errors['ingresos_totales'] = 'Los ingresos totales exceden el límite permitido.'
+            
     except (ValueError, TypeError):
-        errors['ingresos_totales'] = 'Ingresos totales deben ser un número.'
+        errors['ingresos_totales'] = 'Los ingresos totales deben ser un número válido.'
 
-    if data.get('estado_civil') not in ['Soltero/a', 'Casado/a', 'Divorciado/a', 'Viudo/a']:
-        errors['estado_civil'] = 'Estado civil inválido.'
+    # Validación de estado civil
+    estados_civiles_validos = ['Soltero/a', 'Casado/a', 'Divorciado/a', 'Viudo/a']
+    if data.get('estado_civil') not in estados_civiles_validos:
+        errors['estado_civil'] = f'Estado civil inválido. Debe ser uno de: {", ".join(estados_civiles_validos)}.'
 
+    # Validación de dependientes
     if 'dependientes' in data and data['dependientes'] is not None:
         try:
             deps = int(data['dependientes'])
-            if deps < 0: errors['dependientes'] = 'El número de dependientes no puede ser negativo.'
+            if deps < 0:
+                errors['dependientes'] = 'El número de dependientes no puede ser negativo.'
+            if deps > 99:  # Límite razonable
+                errors['dependientes'] = 'El número de dependientes excede el límite razonable.'
         except (ValueError, TypeError):
-             errors['dependientes'] = 'Dependientes debe ser un número entero.'
+            errors['dependientes'] = 'El número de dependientes debe ser un número entero válido.'
+
+    # Validación de deducciones aplicadas
+    if 'deducciones_aplicadas' in data and data['deducciones_aplicadas'] is not None:
+        try:
+            deducciones = float(data['deducciones_aplicadas'])
+            if deducciones < 0:
+                errors['deducciones_aplicadas'] = 'Las deducciones no pueden ser negativas.'
+            if deducciones > 999999999999:
+                errors['deducciones_aplicadas'] = 'Las deducciones exceden el límite permitido.'
+        except (ValueError, TypeError):
+            errors['deducciones_aplicadas'] = 'Las deducciones deben ser un número válido.'
+
+    # Validación de otros_ingresos_deducciones (sanitización)
+    if 'otros_ingresos_deducciones' in data and data['otros_ingresos_deducciones']:
+        otros = str(data['otros_ingresos_deducciones']).strip()
+        if len(otros) > 1000:  # Límite de caracteres
+            errors['otros_ingresos_deducciones'] = 'El campo "otros ingresos/deducciones" es demasiado largo (máximo 1000 caracteres).'
 
     if errors:
         return jsonify({'message': 'Errores de validación', 'errors': errors}), 422
@@ -185,7 +218,7 @@ def create_declaration():
             estado_civil=data['estado_civil'],
             dependientes=data.get('dependientes'),
             otros_ingresos_deducciones=data.get('otros_ingresos_deducciones'),
-            estado_declaracion='Guardada', # Estado inicial
+            estado_declaracion='Guardada',  # Estado inicial
             author=current_user
         )
         db.session.add(declaration)
@@ -278,20 +311,28 @@ def admin_update_user(user_id):
         return jsonify({'message': 'No se recibieron datos JSON.'}), 400
 
     errors = {}
-    # if 'nombre_completo' in data and not data['nombre_completo']:
-    #     errors['nombre_completo'] = 'El nombre completo no puede estar vacío.'
+    
+    # Validación de nombre completo
+    if 'nombre_completo' in data and not data['nombre_completo']:
+        errors['nombre_completo'] = 'El nombre completo no puede estar vacío.'
+    
+    # Validación de correo electrónico
     if 'correo_electronico' in data:
         if not data['correo_electronico']:
             errors['correo_electronico'] = 'El correo electrónico no puede estar vacío.'
         elif data['correo_electronico'] != user_to_edit.correo_electronico and User.query.filter_by(correo_electronico=data['correo_electronico']).first():
             errors['correo_electronico'] = 'El correo electrónico ya está en uso.'
 
-    # if 'password' in data and data['password']:
-    #     if len(data['password']) < 8:
-    #         errors['password'] = 'La nueva contraseña debe tener al menos 8 caracteres.'
+    # Validación de contraseña
+    if 'password' in data and data['password']:
+        if len(data['password']) < 8:
+            errors['password'] = 'La nueva contraseña debe tener al menos 8 caracteres.'
 
+    # Validación de estado
     if 'estado' in data and data['estado'] not in ['activo', 'inactivo']:
-        errors['estado'] = 'Estado inválido.'
+        errors['estado'] = 'Estado inválido. Debe ser "activo" o "inactivo".'
+    
+    # Validación de rol admin
     if 'es_admin' in data and not isinstance(data['es_admin'], bool):
         errors['es_admin'] = 'El rol de administrador debe ser verdadero o falso.'
 
@@ -356,6 +397,10 @@ def update_pass():
     if not data or 'mail' not in data or 'password' not in data:
         return jsonify({'message': 'Correo electrónico y contraseña requeridos.'}), 400
 
+    # Validación de contraseña
+    if len(data['password']) < 8:
+        return jsonify({'message': 'La contraseña debe tener al menos 8 caracteres.'}), 422
+
     user = User.query.filter_by(correo_electronico=data['mail']).first()
     if user:
         user.set_password(data['password'])
@@ -363,3 +408,4 @@ def update_pass():
         return jsonify({'message': 'Contraseña actualizada exitosamente.'}), 200
     else:
         return jsonify({'message': 'Usuario no encontrado.'}), 404
+    
