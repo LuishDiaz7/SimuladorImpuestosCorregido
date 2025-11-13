@@ -52,11 +52,8 @@ const AdminUsersPage: React.FC = () => {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
-  // Verificar permisos correctamente
   useEffect(() => {
-    // Esperar a que termine de cargar la autenticación
     if (!authLoading) {
-      // Si no hay usuario O el usuario no es admin, redirigir
       if (!user || !user.es_admin) {
         console.log('Acceso denegado, redirigiendo a dashboard');
         navigate('/dashboard', { replace: true });
@@ -64,7 +61,6 @@ const AdminUsersPage: React.FC = () => {
     }
   }, [user, authLoading, navigate]);
 
-  // Mostrar spinner mientras carga la autenticación
   if (authLoading) {
     return (
       <div style={{ 
@@ -78,7 +74,6 @@ const AdminUsersPage: React.FC = () => {
     );
   }
 
-  // Early return si no es admin
   if (!user || !user.es_admin) {
     return (
       <div style={{ 
@@ -92,10 +87,8 @@ const AdminUsersPage: React.FC = () => {
     );
   }
 
-  // Solo fetch datos si es admin verificado
   useEffect(() => {
     const fetchUsers = async () => {
-      // No hacer fetch si aún está cargando la autenticación
       if (authLoading || !user || !user.es_admin) {
         return;
       }
@@ -160,11 +153,17 @@ const AdminUsersPage: React.FC = () => {
     }
   };
 
+  // BUG-010 y BUG-008: Validación mejorada
   const validateForm = (): boolean => {
     const errors: FormErrors = {};
     
-    if (!formData.nombre_completo) {
+    // BUG-010: Validar nombre no vacío y con mínimo de caracteres
+    if (!formData.nombre_completo || formData.nombre_completo.trim().length === 0) {
       errors.nombre_completo = 'El nombre completo es requerido';
+    } else if (formData.nombre_completo.trim().length < 3) {
+      errors.nombre_completo = 'El nombre debe tener al menos 3 caracteres';
+    } else if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(formData.nombre_completo)) {
+      errors.nombre_completo = 'El nombre solo debe contener letras';
     }
     
     if (!formData.tipo_documento) {
@@ -173,18 +172,34 @@ const AdminUsersPage: React.FC = () => {
     
     if (!formData.numero_documento) {
       errors.numero_documento = 'El número de documento es requerido';
+    } else if (!/^\d+$/.test(formData.numero_documento)) {
+      errors.numero_documento = 'El número de documento solo debe contener dígitos';
     }
     
+    // BUG-008: Validación estricta de email
     if (!formData.correo_electronico) {
       errors.correo_electronico = 'El correo electrónico es requerido';
-    } else if (!/\S+@\S+\.\S+/.test(formData.correo_electronico)) {
-      errors.correo_electronico = 'El correo electrónico no es válido';
+    } else {
+      // Regex estricto: solo letras, números, puntos, guiones y guiones bajos
+      const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!emailRegex.test(formData.correo_electronico)) {
+        errors.correo_electronico = 'Email inválido. Solo se permiten letras, números, puntos, guiones y guiones bajos';
+      }
     }
     
+    // Validación de contraseña fuerte
     if (!formData.password) {
       errors.password = 'La contraseña es requerida';
     } else if (formData.password.length < 8) {
       errors.password = 'La contraseña debe tener al menos 8 caracteres';
+    } else if (!/(?=.*[a-z])/.test(formData.password)) {
+      errors.password = 'La contraseña debe contener al menos una minúscula';
+    } else if (!/(?=.*[A-Z])/.test(formData.password)) {
+      errors.password = 'La contraseña debe contener al menos una mayúscula';
+    } else if (!/(?=.*\d)/.test(formData.password)) {
+      errors.password = 'La contraseña debe contener al menos un número';
+    } else if (!/(?=.*[!@#$%^&*])/.test(formData.password)) {
+      errors.password = 'La contraseña debe contener al menos un carácter especial (!@#$%^&*)';
     }
     
     setFormErrors(errors);
@@ -292,13 +307,14 @@ const AdminUsersPage: React.FC = () => {
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: '15px' }}>
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Nombre Completo:
+                Nombre Completo: *
               </label>
               <input
                 type="text"
                 name="nombre_completo"
                 value={formData.nombre_completo}
                 onChange={handleInputChange}
+                required
                 style={{
                   width: '100%',
                   padding: '8px',
@@ -350,6 +366,8 @@ const AdminUsersPage: React.FC = () => {
                   name="numero_documento"
                   value={formData.numero_documento}
                   onChange={handleInputChange}
+                  required
+                  pattern={formData.tipo_documento === 'PP' ? '[A-Za-z0-9]+' : '[0-9]+'}
                   style={{
                     width: '100%',
                     padding: '8px',
@@ -362,18 +380,23 @@ const AdminUsersPage: React.FC = () => {
                     {formErrors.numero_documento}
                   </span>
                 )}
+                <small style={{ display: 'block', color: '#666', fontSize: '0.85em', marginTop: '4px' }}>
+                  ℹ️ {formData.tipo_documento === 'PP' ? 'Pasaporte: alfanumérico' : 'Solo números'}
+                </small>
               </div>
             </div>
             
             <div style={{ marginBottom: '15px' }}>
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Correo Electrónico:
+                Correo Electrónico: *
               </label>
               <input
                 type="email"
                 name="correo_electronico"
                 value={formData.correo_electronico}
                 onChange={handleInputChange}
+                required
+                pattern="[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
                 style={{
                   width: '100%',
                   padding: '8px',
@@ -386,17 +409,22 @@ const AdminUsersPage: React.FC = () => {
                   {formErrors.correo_electronico}
                 </span>
               )}
+              <small style={{ display: 'block', color: '#666', fontSize: '0.85em', marginTop: '4px' }}>
+                ℹ️ Solo letras, números, puntos, guiones y guiones bajos
+              </small>
             </div>
             
             <div style={{ marginBottom: '15px' }}>
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Contraseña:
+                Contraseña: *
               </label>
               <input
                 type="password"
                 name="password"
                 value={formData.password}
                 onChange={handleInputChange}
+                required
+                minLength={8}
                 style={{
                   width: '100%',
                   padding: '8px',
@@ -409,6 +437,9 @@ const AdminUsersPage: React.FC = () => {
                   {formErrors.password}
                 </span>
               )}
+              <small style={{ display: 'block', color: '#666', fontSize: '0.85em', marginTop: '4px' }}>
+                ℹ️ Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número, 1 carácter especial
+              </small>
             </div>
             
             <div style={{ marginBottom: '20px' }}>
@@ -577,4 +608,5 @@ const tableCellStyle: React.CSSProperties = {
 };
 
 export default AdminUsersPage;
+
 

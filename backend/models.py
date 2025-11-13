@@ -2,6 +2,7 @@ from . import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+import pytz
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -33,7 +34,14 @@ class Declaration(db.Model):
     dependientes = db.Column(db.Integer, nullable=True)
     otros_ingresos_deducciones = db.Column(db.Text, nullable=True)
     estado_declaracion = db.Column(db.String(50), default='Borrador', nullable=False)
-    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Bug-014: Usar datetime.now() en lugar de datetime.utcnow
+    # Esto registra la hora local del servidor en lugar de UTC
+    fecha_creacion = db.Column(db.DateTime, default=datetime.now)
+    
+    # ALTERNATIVA: mostrar en hora local de Colombia
+    # fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('America/Bogota')))
 
     def __repr__(self):
         return f'<Declaration {self.id} - User {self.user_id} - Año {self.ano_fiscal}>'
+    

@@ -22,7 +22,6 @@ const LoginPage: React.FC = () => {
     event.preventDefault();
     setError(null);
     
-    // BUG-005: Prevenir doble clic
     setIsLoading(true);
 
     try {
@@ -36,7 +35,6 @@ const LoginPage: React.FC = () => {
 
       login(response.data.user);
 
-      // BUG-004: Redirección correcta según rol
       if (response.data.user.es_admin) {
         navigate('/admin/users');
       } else {
@@ -62,7 +60,7 @@ const LoginPage: React.FC = () => {
         setError(apiErrorMessage);
       }
     } finally {
-      // BUG-005: Rehabilitar botón después de la petición
+      
       setIsLoading(false);
     }
   };
@@ -108,7 +106,7 @@ const LoginPage: React.FC = () => {
 
         {error && <p className="error-message">{error}</p>}
 
-        {/* BUG-005: Botón deshabilitado durante carga */}
+        {/* */}
         <button type="submit" disabled={isLoading} style={{width: '100%'}}>
           {isLoading ? 'Iniciando...' : 'Iniciar Sesión'}
         </button>

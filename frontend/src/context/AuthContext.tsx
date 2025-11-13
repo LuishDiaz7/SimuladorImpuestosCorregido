@@ -55,7 +55,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(userData);
   };
 
-  // BUG-008: Función de logout mejorada
+  
   const logout = async () => {
     // NO establecer isLoading=true aquí para no bloquear la UI
     try {

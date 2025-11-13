@@ -20,49 +20,57 @@ const RegisterPage: React.FC = () => {
     const validateForm = () => {
         const newErrors: { [key: string]: string } = {};
 
-        // Validate full name
+        // 1. Validar que no estén vacíos (Usando las claves de formData)
+        Object.keys(formData).forEach((key) => {
+            if (!formData[key as keyof typeof formData]) {
+                newErrors[key] = 'Este campo es obligatorio.';
+            }
+        });
+        
+        // Si hay errores de campo obligatorio, detenemos la validación de reglas complejas
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            return false;
+        }
+
+        // --- Reglas de Validación Específicas (Usando las claves de formData) ---
+
+        // 2. Validate full name (nombre_completo)
         if (formData.nombre_completo.length <= 3) {
-            newErrors.fullName = 'El nombre debe tener más de 3 caracteres.';
-        } else if (!/^[a-zA-Z\s]+$/.test(formData.nombre_completo)) {
-            newErrors.fullName = 'El nombre no debe contener números ni caracteres especiales.';
+            newErrors.nombre_completo = 'El nombre debe tener más de 3 caracteres.';
+        } else if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(formData.nombre_completo)) {
+            newErrors.nombre_completo = 'El nombre solo debe contener letras (incluye acentos y Ñ).';
         }
 
-        // Validate email
+        // 3. Validate email (correo_electronico) - Se usa la clave correcta
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.correo_electronico)) {
-            newErrors.email = 'El correo electrónico debe tener un formato válido.';
+            newErrors.correo_electronico = 'El correo electrónico debe tener un formato válido.';
         }
 
-  
+        // 4. Validación de email ya registrado (se mantiene el 'false' de momento)
         if(false){
-            newErrors.email = 'El correo electrónico ya está registrado.';
+            newErrors.correo_electronico = 'El correo electrónico ya está registrado.';
         }
 
-        // Validate document number
+        // 5. Validate document number (numero_documento)
         if (!/^\d+$/.test(formData.numero_documento)) {
-            newErrors.documentNumber = 'El número de documento solo debe contener números.';
+            newErrors.numero_documento = 'El número de documento solo debe contener números.';
         }
 
-        // Validate password
+        // 6. Validate password (password)
         if (formData.password.length < 8) {
             newErrors.password = 'La contraseña debe tener al menos 8 caracteres.';
         } else if (
             !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)
         ) {
             newErrors.password =
-                'La contraseña debe contener al menos una letra mayúscula, una letra minúscula, un número y un carácter especial.';
+                'La contraseña debe contener al menos una letra mayúscula, una letra minúscula y un número.';
         }
 
-        // Validate confirm password
+        // 7. Validate confirm password (confirmPassword)
         if (formData.password !== formData.confirmPassword) {
             newErrors.confirmPassword = 'La confirmación de contraseña debe coincidir con la contraseña.';
         }
-
-        // Validate required fields
-        Object.keys(formData).forEach((key) => {
-            if (!formData[key as keyof typeof formData]) {
-                newErrors[key] = 'Este campo es obligatorio.';
-            }
-        });
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -71,9 +79,24 @@ const RegisterPage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (validateForm()) {
-            await apiClient.post('/register', formData);
-            console.log('Formulario válido:', formData);
-            navigate('/login')
+            try {
+                // Se envía el objeto sin el campo confirmPassword
+                const { confirmPassword, ...dataToSend } = formData;
+                await apiClient.post('/register', dataToSend);
+                console.log('Registro exitoso:', dataToSend);
+                navigate('/login');
+            } catch (error: any) {
+                // Manejo de errores de la API (Flask/Backend)
+                if (error.response && error.response.status === 422) {
+                    // Errores de validación del backend
+                    setErrors(error.response.data.errors || {});
+                } else if (error.response && error.response.data.message) {
+                    // Otros errores de la API
+                    setErrors({ general: error.response.data.message });
+                } else {
+                    setErrors({ general: 'Error al conectar con el servidor.' });
+                }
+            }
         }
     };
 
@@ -86,6 +109,7 @@ const RegisterPage: React.FC = () => {
         <div className='form-container'>
             <h2>Registro</h2>
             <form onSubmit={handleSubmit}>
+                {errors.general && <p className="error-message">{errors.general}</p>}
                 <div>
                     <label>Tipo de documento</label>
                     <select name="tipo_documento" value={formData.tipo_documento} onChange={handleChange}>
@@ -96,7 +120,8 @@ const RegisterPage: React.FC = () => {
                             </option>
                         ))}
                     </select>
-                    {errors.documentType && <p className="error-message">{errors.documentType}</p>}
+                    {/* Clave corregida: tipo_documento */}
+                    {errors.tipo_documento && <p className="error-message">{errors.tipo_documento}</p>}
                 </div>
 
                 <div>
@@ -107,7 +132,8 @@ const RegisterPage: React.FC = () => {
                         value={formData.numero_documento}
                         onChange={handleChange}
                     />
-                    {errors.documentNumber && <p className="error-message">{errors.documentNumber}</p>}
+                    {/* Clave corregida: numero_documento */}
+                    {errors.numero_documento && <p className="error-message">{errors.numero_documento}</p>}
                 </div>
 
                 <div>
@@ -118,7 +144,8 @@ const RegisterPage: React.FC = () => {
                         value={formData.nombre_completo}
                         onChange={handleChange}
                     />
-                    {errors.fullName && <p className="error-message">{errors.fullName}</p>}
+                    {/* Clave corregida: nombre_completo */}
+                    {errors.nombre_completo && <p className="error-message">{errors.nombre_completo}</p>}
                 </div>
 
                 <div>
@@ -129,7 +156,8 @@ const RegisterPage: React.FC = () => {
                         value={formData.correo_electronico}
                         onChange={handleChange}
                     />
-                    {errors.email && <p className="error-message">{errors.email}</p>}
+                    {/* Clave corregida: correo_electronico */}
+                    {errors.correo_electronico && <p className="error-message">{errors.correo_electronico}</p>}
                 </div>
 
                 <div>

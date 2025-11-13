@@ -17,7 +17,7 @@ function App() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   
-  // BUG-008: Estado para manejar el proceso de logout
+
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleMouseOver = (e: MouseEvent<HTMLButtonElement>) => {
@@ -36,7 +36,7 @@ function App() {
     e.currentTarget.style.backgroundColor = 'var(--color-secondary)';
   };
 
-  // BUG-008: Función mejorada de logout con redirección garantizada
+
   const handleLogout = async () => {
     if (isLoggingOut) return; // Prevenir múltiples clics
     

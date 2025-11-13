@@ -1,16 +1,16 @@
 :root {
   /* Paleta Pastel Morado y Verde */
-  --color-bg: #f8f7ff; /* Fondo muy claro, casi blanco con tinte morado */
-  --color-bg-alt: #e9e7f5; /* Fondo alternativo ligeramente más oscuro */
-  --color-text: #3a3a3a; /* Texto principal oscuro */
-  --color-primary: #a89fcf; /* Morado pastel principal */
-  --color-primary-dark: #8c7db8; /* Morado más oscuro para hover/activo */
-  --color-secondary: #a7d7c5; /* Verde pastel secundario */
-  --color-secondary-dark: #8cbba9; /* Verde más oscuro para hover/activo */
-  --color-accent: #f5d0f0; /* Acento rosa/lila pastel (opcional) */
-  --color-error: #e68e8e; /* Rojo pastel para errores */
-  --color-success: #a7d7ac; /* Verde pastel para éxito */
-  --color-border: #dcd9e8; /* Borde suave */
+  --color-bg: #f8f7ff;
+  --color-bg-alt: #e9e7f5;
+  --color-text: #3a3a3a;
+  --color-primary: #a89fcf;
+  --color-primary-dark: #8c7db8;
+  --color-secondary: #a7d7c5;
+  --color-secondary-dark: #8cbba9;
+  --color-accent: #f5d0f0;
+  --color-error: #e68e8e;
+  --color-success: #a7d7ac;
+  --color-border: #dcd9e8;
 
   --font-family-sans: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
 
@@ -81,28 +81,87 @@ input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="number"],
-select {
+select,
+textarea {
   font-family: var(--font-family-sans);
   padding: 0.75em;
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius);
   font-size: 1rem;
-  width: 100%; /* Hacer que ocupen el ancho por defecto */
-  box-sizing: border-box; /* Para que padding no aumente el tamaño */
+  width: 100%;
+  box-sizing: border-box;
   margin-bottom: 1rem;
 }
 
-input:focus {
+input:focus,
+select:focus,
+textarea:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(168, 159, 207, 0.3); /* Sombra suave morada */
+  box-shadow: 0 0 0 2px rgba(168, 159, 207, 0.3);
 }
 
-label, select {
+label {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
   color: var(--color-primary-dark);
+}
+
+/* NUEVO: Estilos completos para tablas */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  background-color: white;
+  box-shadow: var(--box-shadow);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+thead {
+  background-color: var(--color-bg-alt);
+}
+
+th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-primary-dark);
+  border-bottom: 2px solid var(--color-border);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+tbody tr:hover {
+  background-color: #faf9ff;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Estilos responsive para tablas */
+@media (max-width: 768px) {
+  table {
+    font-size: 0.9rem;
+  }
+  
+  th, td {
+    padding: 0.75rem 0.5rem;
+  }
 }
 
 /* Contenedor general para centrar contenido */
@@ -118,6 +177,7 @@ label, select {
   font-size: 0.9rem;
   margin-top: -0.5rem;
   margin-bottom: 1rem;
+  display: block;
 }
 
 .successful-message {
@@ -138,21 +198,121 @@ label, select {
   border: 1px solid var(--color-border);
 }
 
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  margin-bottom: 0.5rem;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  margin-bottom: 0.25rem;
+}
+
+.form-group small {
+  display: block;
+  color: #666;
+  font-size: 0.85em;
+  margin-top: 0.25rem;
+}
+
 .link {
   text-align: center;
   margin-top: 1rem;
 }
 
-.buttons{
+.buttons {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-top: 1rem;
-  
+  gap: 1rem;
 }
 
-.formUsersButtons{
+.formUsersButtons {
   display: flex;
   justify-content: space-around;
+  gap: 0.5rem;
+}
 
+/* NUEVO: Estilos para badges/estados */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.badge-success {
+  background-color: var(--color-success);
+  color: #0f5132;
+}
+
+.badge-warning {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.badge-danger {
+  background-color: var(--color-error);
+  color: #842029;
+}
+
+.badge-info {
+  background-color: #cfe2ff;
+  color: #084298;
+}
+
+/* NUEVO: Estilos para overflow responsive */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* NUEVO: Estilos para loading y empty states */
+.loading-message,
+.empty-message {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  font-style: italic;
+}
+
+/* NUEVO: Estilos para forms dentro de divs con bg */
+.form-section {
+  background-color: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: var(--border-radius);
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--color-border);
+}
+
+/* NUEVO: Estilos para mensajes de alerta */
+.alert {
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+}
+
+.alert-success {
+  background-color: #d1e7dd;
+  color: #0f5132;
+  border-color: #badbcc;
+}
+
+.alert-error {
+  background-color: #f8d7da;
+  color: #842029;
+  border-color: #f5c2c7;
+}
+
+.alert-info {
+  background-color: #cfe2ff;
+  color: #084298;
+  border-color: #b6d4fe;
 }

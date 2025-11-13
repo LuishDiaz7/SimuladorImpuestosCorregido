@@ -4,7 +4,6 @@ import apiClient from '../api/axiosConfig';
 import { useNavigate } from 'react-router-dom';
 import type { AxiosError } from 'axios';
 
-// Interfaz para el formulario
 interface DeclarationFormData {
     ano_fiscal: number | string;
     ingresos_totales: number | string;
@@ -14,13 +13,11 @@ interface DeclarationFormData {
     otros_ingresos_deducciones?: string;
 }
 
-// Interfaz para la estructura de error esperada de la API
 interface ApiErrorResponse {
     message: string;
     errors?: Record<string, string>;
 }
 
-// BUG-013: Valores iniciales en constante reutilizable
 const INITIAL_FORM_DATA: DeclarationFormData = {
     ano_fiscal: new Date().getFullYear() - 1,
     ingresos_totales: '',
@@ -42,7 +39,6 @@ const NewDeclarationPage: FC = () => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
         
-        // Limpiar errores cuando el usuario escribe
         if (fieldErrors[name]) {
             setFieldErrors(prev => ({ ...prev, [name]: '' }));
         }
@@ -74,16 +70,10 @@ const NewDeclarationPage: FC = () => {
             const response = await apiClient.post('/declarations', dataToSend);
             console.log('Declaración creada:', response.data);
             
-            // BUG-012: Mostrar mensaje de éxito
             setSuccessMessage('¡Declaración creada exitosamente!');
-
-            // BUG-012: Resetear formulario después del éxito
             setFormData({ ...INITIAL_FORM_DATA });
-
-            // Scroll al inicio para ver el mensaje de éxito
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
-            // Opcional: Redirigir después de 2 segundos
             setTimeout(() => {
                 navigate('/dashboard');
             }, 2000);
@@ -99,7 +89,6 @@ const NewDeclarationPage: FC = () => {
                 setError(error.response?.data?.message || 'Error al crear la declaración.');
             }
             
-            // Scroll al inicio para ver el error
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } finally {
             setIsLoading(false);
@@ -110,7 +99,6 @@ const NewDeclarationPage: FC = () => {
         <div className="form-container">
             <h2>Crear Nueva Declaración de Impuestos</h2>
             
-            {/*  Mensaje de éxito */}
             {successMessage && (
                 <div style={{
                     backgroundColor: '#d4edda',
@@ -138,11 +126,15 @@ const NewDeclarationPage: FC = () => {
                         required
                         disabled={isLoading}
                         min="2000"
-                        max="2100"
+                        max={new Date().getFullYear()}
+                        step="1"
                     />
                     {fieldErrors.ano_fiscal && (
                         <span className="error-message">{fieldErrors.ano_fiscal}</span>
                     )}
+                    <small style={{ display: 'block', color: '#666', fontSize: '0.85em', marginTop: '4px' }}>
+                        ℹ️ No puede ser un año futuro (máximo {new Date().getFullYear()})
+                    </small>
                 </div>
 
                 <div className="form-group">
@@ -156,12 +148,15 @@ const NewDeclarationPage: FC = () => {
                         onChange={handleChange}
                         required
                         disabled={isLoading}
-                        placeholder="Ej: 50000.00"
-                        min="0"
+                        placeholder="Ej: 50000000"
+                        min="1000000"
                     />
                     {fieldErrors.ingresos_totales && (
                         <span className="error-message">{fieldErrors.ingresos_totales}</span>
                     )}
+                    <small style={{ display: 'block', color: '#666', fontSize: '0.85em', marginTop: '4px' }}>
+                        ℹ️ Mínimo $1,000,000 COP
+                    </small>
                 </div>
 
                 <div className="form-group">
@@ -188,18 +183,21 @@ const NewDeclarationPage: FC = () => {
                     <label htmlFor="deducciones_aplicadas">Deducciones Aplicadas:</label>
                     <input
                         type="number"
-                        step="0.01"
+                        step="1000"
                         id="deducciones_aplicadas"
                         name="deducciones_aplicadas"
                         value={formData.deducciones_aplicadas}
                         onChange={handleChange}
                         disabled={isLoading}
-                        placeholder="Opcional, Ej: 5000.00"
+                        placeholder="Opcional, Ej: 5000000"
                         min="0"
                     />
                     {fieldErrors.deducciones_aplicadas && (
                         <span className="error-message">{fieldErrors.deducciones_aplicadas}</span>
                     )}
+                    <small style={{ display: 'block', color: '#666', fontSize: '0.85em', marginTop: '4px' }}>
+                        ℹ️ Mínimo $1,000 COP (step de $1,000)
+                    </small>
                 </div>
 
                 <div className="form-group">
@@ -213,11 +211,15 @@ const NewDeclarationPage: FC = () => {
                         disabled={isLoading}
                         placeholder="Opcional, Ej: 2"
                         min="0"
-                        max="99"
+                        max="5"
+                        step="1"
                     />
                     {fieldErrors.dependientes && (
                         <span className="error-message">{fieldErrors.dependientes}</span>
                     )}
+                    <small style={{ display: 'block', color: '#666', fontSize: '0.85em', marginTop: '4px' }}>
+                        ℹ️ Máximo 5 dependientes (normativa colombiana)
+                    </small>
                 </div>
 
                 <div className="form-group">
@@ -248,3 +250,5 @@ const NewDeclarationPage: FC = () => {
 };
 
 export default NewDeclarationPage;
+
+
